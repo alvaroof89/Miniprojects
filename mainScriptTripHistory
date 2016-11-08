@@ -5,7 +5,7 @@
 #################################################################################
 #Load Data
 #################################################################################
-setwd("//bbclsnetap1.emea.healthcare.cnb/USR/Users/GGORS/datos/Personal Data/DataScience/Trip History Data Set")
+setwd("please fill")
 df <-read.csv("2010-Q4-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
 #df2 <- read.csv(file = "2011-Q1-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
 #df3 <- read.csv(file = "2011-Q2-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
