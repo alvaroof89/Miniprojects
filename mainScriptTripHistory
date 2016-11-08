@@ -1,0 +1,124 @@
+#################################################################################
+#Trip History
+#Goal is to classify users into Casual or Registered
+#################################################################################
+#################################################################################
+#Load Data
+#################################################################################
+setwd("//bbclsnetap1.emea.healthcare.cnb/USR/Users/GGORS/datos/Personal Data/DataScience/Trip History Data Set")
+df <-read.csv("2010-Q4-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
+#df2 <- read.csv(file = "2011-Q1-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
+#df3 <- read.csv(file = "2011-Q2-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
+#df4 <- read.csv(file = "2011-Q3-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
+#df5 <- read.csv(file = "2011-Q4-cabi-trip-history-data.csv", stringsAsFactors = FALSE)
+
+#df <- rbind(df, df2)
+#df <- rbind(df, df3)
+#df <- rbind(df, df4)
+#df <- rbind(df, df5)
+
+#rm(df2)
+#rm(df3)
+#rm(df4)
+#rm(df5)
+#################################################################################
+#DATA CLEANING
+#################################################################################
+todelete <- grepl("\\?", df$Bike.)
+df <- df[!todelete,]
+
+todelete <- df$End.station == ""
+df <- df[!todelete,]
+
+todelete <- df$Start.station == ""
+df <- df[!todelete,]
+
+rm(todelete)
+#################################################################################
+#PREPROCCESING
+#################################################################################
+
+#converts trip's duration to seconds
+library(stringr)
+duration <- str_match_all(df$Duration, "\\d+") #extract numeric values for hours, minutes and seconds
+#from character string
+
+#transform them to seconds
+for(i in seq(1,length(duration))){
+  seconds <- 0
+  seconds <- as.numeric(duration[[i]][1][1])*3600 +  as.numeric(duration[[i]][2][1])*60 + as.numeric(duration[[i]][3][1])
+  duration[[i]] <- seconds
+}
+
+df$Duration <- unlist(duration)
+rm(duration)
+rm(seconds)
+
+#preProccesing Dates
+
+#library(dplyr)
+#Split dates and times into two variables. afterwards, we preferred to use POSIXlt variables so discarded this
+#foo <- str_split(df$Start.date, " ")
+#df$Start.date <- unlist(lapply(foo, '[[', 1))
+#df$Start.time <- unlist(lapply(foo, '[[', 2))
+#foo <- str_split(df$End.date, " ")
+#df$End.date <- unlist(lapply(foo, '[[', 1))
+#df$End.time <- unlist(lapply(foo, '[[', 2))
+#rm(foo)
+#df <- mutate(df, 
+#             Start.date = strptime(df$Start.date, format = '%m/%d/%Y'), 
+#             End.date = strptime(df$End.date, format = '%m/%d/%Y'), 
+#             Start.time = strptime(df$Start.time, format = '%H:%M'), 
+#             End.time = strptime(df$End.time, format = '%H:%M'))
+
+df$Start.date <- as.Date(df$Start.date, format = '%m/%d/%Y %H:%M')
+df$End.date <- as.Date(df$End.date, format = '%m/%d/%Y %H:%M')
+
+
+#converting start and End Station into numerical IDs
+df$Start.station <- gsub("[\\(\\)]", "", 
+                         str_extract(df$Start.station, "\\(\\d+\\)"))
+df$End.station <- gsub("[\\(\\)]", "", 
+                       str_extract(df$End.station, "\\(\\d+\\)"))
+
+#concatenating stations to make an unique way
+df$track <- paste(df$Start.station,df$End.station,sep = "")
+
+#add usage variable from Bike.
+count.bikes <- table(df$Bike.)
+df$usage <- ifelse((count.bikes[df$Bike.] > mean(count.bikes)+2*sd(count.bikes)) | (count.bikes[df$Bike.] < mean(count.bikes)-2*sd(count.bikes)), 1, 0)
+df$usage <- as.factor(df$usage)
+
+#################################################################################
+#MODELLING
+#################################################################################
+
+#do a split in a dataset into train and test sets
+library(caTools)
+set.seed(1488)
+
+df$Member.Type <- ifelse(as.character(df$Member.Type) == "Registered", 1, 0)
+df$Member.Type <- as.factor(df$Member.Type)
+split <- sample.split(df$Member.Type, SplitRatio = 0.70)
+train <- subset(df, split == TRUE)
+test <- subset(df, split == FALSE)
+       
+
+#general model with RF               
+library(randomForest)
+
+RF <- randomForest(Member.Type ~ . - Bike.
+          ,data = train
+          ,nodesize = 5
+          ,ntree = 5000
+          ,importance = TRUE
+)
+
+predTest <- predict(RF, newdata = test, type = "response")
+confus <- table(test$Member.Type, predTest)
+(confus[1]+confus[4])/nrow(test)
+#RF <- glm(Member.Type ~ Duration + Start.station + End.station + Bike. + Start.date.ct + End.date.ct
+#                   ,train
+#                   ,family = "binomial"
+#)
+
